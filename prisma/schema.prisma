@@ -1,0 +1,248 @@
+// Lược đồ CSDL FridgeMenu (mục 5.4)
+// Quy ước: mọi lượng nguyên liệu đều quy về GAM để nhân với giá trị dinh dưỡng trên 100 g.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  // URL kết nối khai báo trong prisma.config.ts (Prisma 7)
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum Sex {
+  MALE
+  FEMALE
+}
+
+enum MealType {
+  BREAKFAST
+  LUNCH
+  SNACK
+  DINNER
+}
+
+enum FoodSource {
+  VN_FCT
+  USDA
+  CUSTOM
+}
+
+// ---------- Người dùng & hộ gia đình ----------
+
+model User {
+  id            String            @id @default(uuid())
+  email         String            @unique
+  name          String?
+  role          Role              @default(USER)
+  profile       HealthProfile?
+  members       HouseholdMember[]
+  recipes       Recipe[]
+  aiSuggestions AiSuggestion[]
+  createdAt     DateTime          @default(now())
+}
+
+model HealthProfile {
+  userId        String   @id
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  birthYear     Int
+  sex           Sex
+  weightKg      Float
+  heightCm      Float
+  activityLevel Float // 1.2 ít vận động ... 1.9 rất nặng
+  goal          String // giam_can | giu_can | tang_can
+  allergies     String[]
+}
+
+model Household {
+  id       String            @id @default(uuid())
+  name     String
+  type     String            @default("family") // family | organization
+  servings Int               @default(1) // số suất ăn mỗi bữa
+  members  HouseholdMember[]
+  fridges  Fridge[]
+  plans    MealPlan[]
+}
+
+model HouseholdMember {
+  userId      String
+  householdId String
+  isOwner     Boolean   @default(false)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@id([userId, householdId])
+}
+
+// ---------- Tủ lạnh ----------
+
+model Fridge {
+  id          String       @id @default(uuid())
+  name        String
+  deviceId    String?      @unique // tủ lạnh thông minh
+  householdId String
+  household   Household    @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  items       FridgeItem[]
+}
+
+model FridgeItem {
+  id        String    @id @default(uuid())
+  fridgeId  String
+  foodId    Int
+  quantityG Float // quy hết về gam để tính dinh dưỡng
+  unitLabel String? // "2 quả", "1 bó" để hiển thị
+  addedAt   DateTime  @default(now())
+  expiresAt DateTime?
+  fridge    Fridge    @relation(fields: [fridgeId], references: [id], onDelete: Cascade)
+  food      Food      @relation(fields: [foodId], references: [id])
+
+  @@index([fridgeId])
+  @@index([expiresAt])
+}
+
+// ---------- Thực phẩm & dinh dưỡng ----------
+
+model Food {
+  id            Int                @id @default(autoincrement())
+  nameVi        String
+  nameEn        String?
+  group         String // ngũ cốc, rau, thịt, cá...
+  source        FoodSource
+  sourceCode    String? // mã trong bảng VN hoặc fdcId của USDA
+  nutrients     FoodNutrient[]
+  fridgeItems   FridgeItem[]
+  ingredients   RecipeIngredient[]
+  shoppingItems ShoppingItem[]
+
+  @@index([nameVi])
+}
+
+model Nutrient {
+  id     Int            @id @default(autoincrement())
+  code   String         @unique // ENERC_KCAL, PROCNT, FAT, CHOCDF, FIBTG, CA, FE...
+  nameVi String
+  unit   String // kcal, g, mg, mcg
+  foods  FoodNutrient[]
+}
+
+model FoodNutrient {
+  foodId     Int
+  nutrientId Int
+  per100g    Float
+  food       Food     @relation(fields: [foodId], references: [id], onDelete: Cascade)
+  nutrient   Nutrient @relation(fields: [nutrientId], references: [id], onDelete: Cascade)
+
+  @@id([foodId, nutrientId])
+}
+
+model NutrientRequirement {
+  id            Int    @id @default(autoincrement())
+  nutrientCode  String
+  sex           Sex?
+  ageFrom       Int
+  ageTo         Int
+  activityLevel Float? // null = áp dụng cho mọi mức vận động
+  amount        Float // lượng khuyến nghị/ngày
+  unit          String
+  source        String // "Viện Dinh dưỡng 2016", "WHO"
+
+  @@index([nutrientCode])
+}
+
+// ---------- Công thức ----------
+
+model Recipe {
+  id          String             @id @default(uuid())
+  name        String
+  description String?
+  servings    Int                @default(2)
+  minutes     Int?
+  imageUrl    String?
+  region      String? // Bắc, Trung, Nam
+  steps       Json // ["Bước 1...", "Bước 2..."]
+  isPublic    Boolean            @default(true)
+  createdById String?
+  createdBy   User?              @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  ingredients RecipeIngredient[]
+  slots       MealSlot[]
+}
+
+model RecipeIngredient {
+  recipeId String
+  foodId   Int
+  grams    Float
+  note     String?
+  recipe   Recipe  @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  food     Food    @relation(fields: [foodId], references: [id])
+
+  @@id([recipeId, foodId])
+}
+
+// ---------- Lịch thực đơn ----------
+
+model MealPlan {
+  id            String         @id @default(uuid())
+  householdId   String
+  weekStart     DateTime       @db.Date
+  household     Household      @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  slots         MealSlot[]
+  shoppingLists ShoppingList[]
+
+  @@unique([householdId, weekStart])
+}
+
+model MealSlot {
+  id       String   @id @default(uuid())
+  planId   String
+  date     DateTime @db.Date
+  mealType MealType
+  recipeId String
+  servings Int      @default(1)
+  cooked   Boolean  @default(false)
+  plan     MealPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  recipe   Recipe   @relation(fields: [recipeId], references: [id])
+
+  @@index([planId, date])
+}
+
+// ---------- Đi chợ (sinh từ MealPlan trừ FridgeItem) ----------
+
+model ShoppingList {
+  id        String         @id @default(uuid())
+  planId    String
+  createdAt DateTime       @default(now())
+  plan      MealPlan       @relation(fields: [planId], references: [id], onDelete: Cascade)
+  items     ShoppingItem[]
+}
+
+model ShoppingItem {
+  id        String       @id @default(uuid())
+  listId    String
+  foodId    Int
+  quantityG Float
+  bought    Boolean      @default(false)
+  list      ShoppingList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  food      Food         @relation(fields: [foodId], references: [id])
+
+  @@unique([listId, foodId])
+}
+
+// ---------- Gợi ý AI ----------
+
+model AiSuggestion {
+  id        String   @id @default(uuid())
+  userId    String
+  input     Json // nguyên liệu, mục tiêu, dị ứng... gửi cho AI
+  result    Json // danh sách món AI trả về
+  rating    Int? // đánh giá của người dùng 1–5
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
