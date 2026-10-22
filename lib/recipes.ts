@@ -48,15 +48,23 @@ export async function getRecipeSummaries() {
     include: withNutrients,
     orderBy: { name: "asc" },
   });
-  return rows.map((r) => ({
-    id: r.id,
-    name: r.name,
-    region: r.region,
-    minutes: r.minutes,
-    servings: r.servings,
-    kcal: Math.round(nutritionOf(r).ENERC_KCAL ?? 0),
-    ingredientNames: r.ingredients.map((i) => i.food.nameVi),
-  }));
+  return rows.map((r) => {
+    const n = nutritionOf(r);
+    return {
+      id: r.id,
+      name: r.name,
+      region: r.region,
+      minutes: r.minutes,
+      servings: r.servings,
+      kcal: Math.round(n.ENERC_KCAL ?? 0),
+      // Dinh dưỡng 1 khẩu phần, dùng để cộng theo ngày trong lịch thực đơn
+      proteinG: n.PROCNT ?? 0,
+      fatG: n.FAT ?? 0,
+      carbG: n.CHOCDF ?? 0,
+      fiberG: n.FIBTG ?? 0,
+      ingredientNames: r.ingredients.map((i) => i.food.nameVi),
+    };
+  });
 }
 
 export type RecipeSummary = Awaited<ReturnType<typeof getRecipeSummaries>>[number];

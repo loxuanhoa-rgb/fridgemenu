@@ -241,6 +241,7 @@ model AiSuggestion {
   input     Json // nguyên liệu, mục tiêu, dị ứng... gửi cho AI
   result    Json // danh sách món AI trả về
   rating    Int? // đánh giá của người dùng 1–5
+  accepted  Boolean  @default(false) // người dùng đã lưu gợi ý vào thực đơn
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 

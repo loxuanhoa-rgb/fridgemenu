@@ -6,6 +6,7 @@ const NAV = [
   { href: "/", label: "Trang chủ" },
   { href: "/fridge", label: "Tủ lạnh" },
   { href: "/recipes", label: "Công thức" },
+  { href: "/planner", label: "Thực đơn" },
   { href: "/profile", label: "Hồ sơ sức khỏe" },
 ];
 
@@ -14,11 +15,11 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
   return (
     <div className="flex flex-1 flex-col">
       <header className="border-b">
-        <div className="mx-auto flex w-full max-w-3xl items-center gap-4 px-6 py-3">
+        <div className="mx-auto flex w-full max-w-6xl items-center gap-4 px-6 py-3">
           <Link href="/" className="font-semibold">
             FridgeMenu
           </Link>
-          <nav className="flex flex-1 gap-3 text-sm text-muted-foreground">
+          <nav className="flex flex-1 gap-3 overflow-x-auto whitespace-nowrap text-sm text-muted-foreground">
             {NAV.map((n) => (
               <Link key={n.href} href={n.href} className="hover:text-foreground">
                 {n.label}
@@ -32,7 +33,7 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
           </form>
         </div>
       </header>
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 p-6">{children}</main>
+      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-6">{children}</main>
     </div>
   );
 }
